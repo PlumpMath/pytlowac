@@ -3,7 +3,6 @@
             [clojure.core.match :refer [match]]
             [clojure.set :refer [map-invert]]
             [clojure.tools.logging :as log]
-            [taoensso.nippy :as nippy]
             [zeromq.zmq :as zmq])
   (:import [org.zeromq ZMQ$Poller]
            [java.util.concurrent LinkedBlockingQueue]))
@@ -15,16 +14,16 @@
       (let [options (if tail
                       (bit-or zmq/no-block zmq/send-more)
                       zmq/no-block)
-            bytes (nippy/freeze head)
-            res (zmq/send sock bytes options)]
+            res (if (string? head)
+                  (zmq/send-str sock head options)
+                  (zmq/send sock head options))]
         (cond
           (= false res) false
           tail (recur tail)
           :else true)))))
 
 (defn- receive-all [sock]
-  (let [parts (map nippy/thaw
-                   (zmq/receive-all sock))]
+  (let [parts (zmq/receive-all sock)]
     (if (= (count parts) 1)
       (first parts)
       parts)))
@@ -180,15 +179,13 @@
                  (recur pairings)))))))
 
 (defn- start-daemon [name looper-fn]
-  (println "starting " name)
   (doto (Thread. (fn []
                    (log/info "Daemon" name "started")
                    (looper-fn)
                    (log/info "Daemon" name "stopped")))
     (.setName name)
     (.setDaemon true)
-    (.start))
-  (println "ret"))
+    (.start)))
 
 (defn start-looper [name zcontext]
   (let [queue (LinkedBlockingQueue. 8)

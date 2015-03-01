@@ -1,5 +1,5 @@
 (ns net.pasdziernik.pytlowac.context
-  (:require [clojure.core.async :refer [close!]]
+  (:require [clojure.core.async :refer [close! >!!]]
             [com.stuartsierra.component :as component]
             [zeromq.zmq :as zmq]
             [net.pasdziernik.pytlowac.looper :refer [start-looper]]))
@@ -17,12 +17,13 @@
           (assoc :ctrl-chan ctrl-chan))))
 
   (stop [this]
-    (close! (:ctrl-chan this))
+    (close! ctrl-chan)
     (-> this
         (assoc :zcontext nil)
         (assoc :ctrl-chan nil)))
 
   )
 
-(defn context [name]
-  (Context. name nil nil))
+(defn register! [context socket in out]
+  (>!! (:ctrl-chan context)
+       [:register socket {:in in :out out}]))
